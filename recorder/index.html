@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<title>Aster's voice - record these</title>
+<style>
+  :root{
+    --bg:#f7f5f0; --card:#ffffff; --ink:#20201d; --muted:#6f6a61;
+    --line:#e5e0d6; --accent:#2f6f4e; --accent-soft:#e8f0ea; --rec:#b3382c;
+    --shadow:0 1px 2px rgba(32,32,29,.05), 0 8px 28px rgba(32,32,29,.07);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--ink);
+    font:16px/1.5 ui-sans-serif,-apple-system,"Segoe UI",Roboto,system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    padding:0 0 env(safe-area-inset-bottom);
+  }
+  .wrap{max-width:660px;margin:0 auto;padding:28px 20px 96px}
+  h1{font-size:1.35rem;line-height:1.25;margin:0 0 6px;letter-spacing:-.01em}
+  .sub{color:var(--muted);margin:0}
+  .sub b{color:var(--ink);font-weight:600}
+  .top{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:14px}
+  .count{font-variant-numeric:tabular-nums;color:var(--muted);font-size:.9rem}
+  .bar{height:6px;background:var(--line);border-radius:99px;overflow:hidden;margin-bottom:26px}
+  .bar > i{display:block;height:100%;width:0;background:var(--accent);border-radius:99px;transition:width .3s ease}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:26px 24px 22px;box-shadow:var(--shadow)}
+  .kicker{font-size:.75rem;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:14px}
+  .kicker .dot{display:inline-block;width:7px;height:7px;border-radius:99px;background:var(--accent);margin-right:8px;vertical-align:1px}
+  .kicker .dot.warm{background:#c9a227}
+  .prompt{font-size:clamp(1.5rem,5.4vw,2.3rem);line-height:1.25;font-weight:600;letter-spacing:-.015em;margin:0 0 14px;overflow-wrap:anywhere}
+  .prompt .gap{color:#b8b1a4;font-weight:400;padding:0 .12em}
+  .prompt .word{color:var(--accent)}
+  .hint{color:var(--muted);margin:0 0 18px;font-size:.95rem}
+  .hint b{color:var(--ink);font-weight:600}
+  .meter{height:8px;background:#f0ece4;border-radius:99px;overflow:hidden;margin:0 0 20px}
+  .meter > i{display:block;height:100%;width:0;background:var(--accent);transition:width .06s linear}
+  .meter.live > i{background:var(--rec)}
+  .row{display:flex;gap:10px;flex-wrap:wrap}
+  button{font:inherit;font-weight:600;border-radius:12px;border:1px solid var(--line);background:#fff;color:var(--ink);padding:13px 18px;min-height:48px;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .06s ease, background .15s ease, border-color .15s ease}
+  button:active{transform:scale(.985)}
+  button:disabled{opacity:.4;cursor:default}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  button.primary:hover{background:#276044}
+  button.ghost{background:transparent;border-color:transparent;color:var(--muted);padding-left:8px;padding-right:8px}
+  button.ghost:hover{color:var(--ink)}
+  button.danger{background:var(--rec);border-color:var(--rec);color:#fff}
+  button.grow{flex:1 1 140px}
+  kbd{font:inherit;font-size:.75rem;border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:1px 5px;color:var(--muted);background:#faf8f4}
+  .hidden{display:none !important}
+  .pulse{animation:pulse 1.2s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+  .list{margin:0;padding:0;list-style:none}
+  .list li{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:.93rem}
+  .list li:last-child{border-bottom:0}
+  .list .id{color:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.82rem}
+  .list .said{margin-left:auto;color:var(--muted);text-align:right;max-width:52%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tick{color:var(--accent);font-weight:700}
+  details{margin-top:22px;border-top:1px solid var(--line);padding-top:18px}
+  summary{cursor:pointer;color:var(--muted);font-size:.9rem;font-weight:600}
+  summary:hover{color:var(--ink)}
+  .note{background:var(--accent-soft);border-radius:12px;padding:14px 16px;font-size:.9rem;color:#2b4c3a;margin:18px 0 0}
+  .warn{background:#fdf3d8;border-radius:12px;padding:14px 16px;font-size:.9rem;color:#6b5417;margin:0 0 20px}
+  .warn code{background:rgba(0,0,0,.06);padding:1px 5px;border-radius:4px}
+  .choice{display:block;width:100%;text-align:left;padding:18px;margin-bottom:10px;border-radius:14px;border:1px solid var(--line);background:#fff;cursor:pointer;font:inherit;color:inherit}
+  .choice:hover{border-color:#cfc7b8}
+  .choice .t{font-weight:650;margin-bottom:3px}
+  .choice .d{color:var(--muted);font-size:.9rem;font-weight:400}
+  .choice.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+  footer{margin-top:34px;color:var(--muted);font-size:.83rem;line-height:1.6}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header id="screenHead">
+    <h1>Aster's voice</h1>
+    <p class="sub" id="sub">Record these straight into the browser. <b>34 clips, about 6 minutes.</b></p>
+  </header>
+
+  <div id="banner" class="warn hidden"></div>
+
+  <section id="screenStart" class="hidden">
+    <div class="bar"><i id="startBar"></i></div>
+    <button class="choice on" id="choiceEssentials" type="button">
+      <div class="t">Just the ones that need you - 34 clips</div>
+      <div class="d">The 23 blends and the 11 trickiest letter sounds. VoiceWave handles the other 102, because text-to-speech is genuinely fine for whole words and whole sentences.</div>
+    </button>
+    <button class="choice" id="choiceAll" type="button">
+      <div class="t">Record all of it - 136 clips</div>
+      <div class="d">If you would rather the whole app sound like you and be done with it. About 25 minutes.</div>
+    </button>
+    <div class="row" style="margin-top:18px">
+      <button class="primary grow" id="startBtn" type="button">Start recording</button>
+      <button class="ghost hidden" id="resumeBtn" type="button">Resume where I left off</button>
+    </div>
+    <p class="note">Nothing is uploaded anywhere. The recordings stay in this browser until you press <b>Download .zip</b> - then they are yours to hand over.</p>
+  </section>
+
+  <section id="screenRecord" class="hidden">
+    <div class="top">
+      <span class="count" id="count">1 of 34</span>
+      <span class="count" id="modeLabel"></span>
+    </div>
+    <div class="bar"><i id="bar"></i></div>
+
+    <div class="card" id="card">
+      <div class="kicker" id="kicker"></div>
+      <p class="prompt" id="prompt"></p>
+      <p class="hint" id="hint"></p>
+      <div class="meter" id="meter"><i id="meterFill"></i></div>
+
+      <div class="row">
+        <button class="primary grow" id="recBtn" type="button">Record</button>
+        <button class="danger grow hidden" id="stopBtn" type="button">Stop</button>
+      </div>
+
+      <div class="row hidden" id="afterRow" style="margin-top:10px">
+        <button class="grow" id="playBtn" type="button">Play</button>
+        <button class="primary grow" id="keepBtn" type="button">Keep it</button>
+        <button class="grow" id="retryBtn" type="button">Try again</button>
+      </div>
+
+      <div class="row" style="margin-top:14px">
+        <button class="ghost" id="backBtn" type="button">&larr; Back</button>
+        <button class="ghost" id="skipBtn" type="button" style="margin-left:auto">Skip for now &rarr;</button>
+      </div>
+    </div>
+
+    <p class="count" style="margin-top:14px">
+      <kbd>space</kbd> record &middot; <kbd>enter</kbd> keep &middot; <kbd>r</kbd> retry
+    </p>
+
+    <details id="handledBlock">
+      <summary id="handledCount">See what VoiceWave is handling</summary>
+      <ul class="list" id="handledList"></ul>
+    </details>
+  </section>
+
+  <section id="screenDone" class="hidden">
+    <div class="card">
+      <div class="kicker"><span class="dot"></span><span id="doneKicker">All done</span></div>
+      <p class="prompt" id="doneTitle">Thank you - that's everything.</p>
+      <p class="hint" id="doneHint"></p>
+      <div class="row">
+        <button class="primary grow" id="zipBtn" type="button">Download .zip</button>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button class="grow" id="backToRecord" type="button">Record more</button>
+        <button class="grow" id="wipeBtn" type="button">Delete everything</button>
+      </div>
+    </div>
+    <details open>
+      <summary>What is in the zip</summary>
+      <ul class="list" id="zipList"></ul>
+    </details>
+  </section>
+
+  <footer>
+    Recorded in the browser, stored in this browser. No account, no upload.
+    Drop the zip contents into <b>aster-reads/audio/</b> and the app will find them.
+  </footer>
+</div>
+
+<script>
+// ---- what to say -------------------------------------------------------------
+const SAY = {a:'a',b:'b',c:'k',d:'d',e:'e',f:'fff',g:'g',h:'hhh',i:'i',j:'j',k:'k',
+  l:'lll',m:'mmm',n:'nnn',o:'o',p:'p',q:'kw',r:'rrr',s:'sss',t:'t',u:'u',v:'vvv',
+  w:'w',x:'ks',y:'y',z:'zzz'};
+
+const PH_HINT = {
+  a:'The short <b>a</b>, as in cat. Mouth open, keep it short.',
+  b:'Just the tiny puff of <b>b</b>. No "uh" on the end.',
+  c:'The hard <b>k</b> sound, as in cat.',
+  d:'A quick <b>d</b>. No "uh" on the end.',
+  e:'The short <b>e</b>, as in bed.',
+  f:'Hold it: <b>ffff</b>. No vowel after it.',
+  g:'The hard <b>g</b>, as in gum. Not "j".',
+  h:'A soft breath out: <b>hhh</b>.',
+  i:'The short <b>i</b>, as in pig.',
+  j:'The <b>j</b> as in jam.',
+  k:'The hard <b>k</b> sound, as in kite.',
+  l:'Hold it: <b>llll</b>.',
+  m:'Hold it, lips closed: <b>mmmm</b>.',
+  n:'Hold it: <b>nnnn</b>.',
+  o:'The short <b>o</b>, as in hot.',
+  p:'Just the puff of <b>p</b>. No "uh" on the end.',
+  q:'<b>kw</b>, as in queen.',
+  r:'Hold it: <b>rrrr</b>.',
+  s:'The long snake sound: <b>ssss</b>.',
+  t:'Just a quick <b>t</b>. No "uh" on the end.',
+  u:'The short <b>u</b>, as in sun.',
+  v:'Hold it: <b>vvvv</b>.',
+  w:'Round your lips: <b>w</b>, as in web.',
+  x:'<b>ks</b>, as in box.',
+  y:'<b>y</b>, as in yes.',
+  z:'Buzz it: <b>zzzz</b>.'
+};
+
+const VOWEL = {a:'short a, as in cat', e:'short e, as in bed', i:'short i, as in pig',
+  o:'short o, as in hot', u:'short u, as in sun'};
+
+// the eleven sounds a synthesised voice cannot do without damage
+const HARD = ['a','b','c','d','e','g','i','o','p','t','u'];
+
+const WORDS = [
+  ['ant',['a','n','t']], ['sat',['s','a','t']], ['mat',['m','a','t']],
+  ['man',['m','a','n']], ['map',['m','a','p']], ['pan',['p','a','n']],
+  ['pin',['p','i','n']], ['tap',['t','a','p']], ['nap',['n','a','p']],
+  ['dog',['d','o','g']], ['cat',['c','a','t']], ['tin',['t','i','n']],
+  ['sip',['s','i','p']], ['mad',['m','a','d']], ['sad',['s','a','d']],
+  ['dad',['d','a','d']], ['dig',['d','i','g']], ['dot',['d','o','t']],
+  ['cot',['c','o','t']], ['cap',['c','a','p']], ['kid',['k','i','d']],
+  ['mop',['m','o','p']], ['pot',['p','o','t']]
+];
+
+const UI = [
+  ['ui_welcome','Hi Aster. [PAUSE:0.6] Ready to play with sounds?'],
+  ['ui_ready','Tap the green button. [PAUSE:0.4] I will wait.'],
+  ['ui_listen','Listen.'],
+  ['ui_again','Hear it again.'],
+  ['q_which_starts','Which one starts with...'],
+  ['ui_blend_intro','Listen to the sounds. [PAUSE:0.5] Then find the picture.'],
+  ['ui_this_is','This one is...'],
+  ['ui_lets_try','Let us do this one together. [PAUSE:0.6]'],
+  ['ui_hint','Here is a hint.'],
+  ['ui_end','That is it for today. [PAUSE:0.5] You did really well, Aster.'],
+  ['ui_gate','Grown-ups only. [PAUSE:0.5] Hold the button.'],
+  ['ui_slow','Let us go slowly.'],
+  ['ui_read_to_me','I will read it. [PAUSE:0.4] You follow with your finger.'],
+  ['ui_trace','Start at the green dot. [PAUSE:0.4] Go around, and down.'],
+  ['q_which_rhymes','Which one rhymes with...']
+];
+
+const PRAISE = [
+  'That is it!', 'Yes! You heard it.', 'You got it, Aster.', 'Nice listening.',
+  'That is the one.', 'Look at you go.', 'Mm. Perfect.', 'You found it.'
+];
+
+const TRIES = [
+  'Not quite. [PAUSE:0.5] Let us listen again.',
+  'Close. [PAUSE:0.4] Try once more.',
+  'Hmm. [PAUSE:0.5] Listen carefully.',
+  'That one is tricky. [PAUSE:0.4] One more try.',
+  'Almost. [PAUSE:0.4] You are nearly there.',
+  'Let us hear it again. [PAUSE:0.5] Then you pick.'
+];
+
+const BOOK = [
+  ['book_title','Cat and Ant. [PAUSE:0.8] Read it with me.'],
+  ['book_p1','Cat.'],
+  ['book_p2','Cat sat.'],
+  ['book_p3','Cat sat on a mat.'],
+  ['book_p4','Ant!'],
+  ['book_p5','Ant sat on the mat.'],
+  ['book_p6','Cat and ant.'],
+  ['book_p7','Cat! [PAUSE:0.5] Ant is sad.'],
+  ['book_p8','Cat did nap. [PAUSE:0.5] Ant did nap. [PAUSE:0.8] Good night!']
+];
+
+const NAMES = {
+  a:'ay', b:'bee', c:'see', d:'dee', e:'ee', f:'eff', g:'jee', h:'aitch', i:'eye',
+  j:'jay', k:'kay', l:'ell', m:'em', n:'en', o:'oh', p:'pee', q:'cue', r:'ar',
+  s:'ess', t:'tee', u:'you', v:'vee', w:'double-you', x:'ex', y:'why', z:'zee'
+};
+
+// ---- build the queue ---------------------------------------------------------
+function blendItem(w, ph) {
+  const v = ph.find(function (p) { return VOWEL[p]; });
+  const line = ph.map(function (p) { return SAY[p]; }).join(' - ') + ' ... ' + w;
+  return {
+    id: 'blend_' + w,
+    tier: 'must',
+    kind: 'Blend',
+    label: 'Blend',
+    prompt: ph.map(function (p) { return SAY[p]; }).join(' <span class="gap">-</span> ') +
+            ' <span class="gap">...</span> <span class="word">' + w + '</span>',
+    hint: 'Stretch the first sound like a rubber band. Small gap. Small gap. ' +
+          'Then the whole word, normal speed, with a smile. ' +
+          (v ? 'That is ' + VOWEL[v] + '.' : ''),
+    line: line,
+    saves: ['blend_' + w]
+  };
+}
+
+function phItem(l) {
+  const hard = HARD.indexOf(l) >= 0;
+  return {
+    id: 'ph_' + l,
+    tier: hard ? 'better' : 'tts',
+    kind: 'Letter sound',
+    label: hard ? 'Letter sound' : 'Letter sound',
+    prompt: '<span class="word">' + l + '</span>',
+    hint: PH_HINT[l] + ' <b>Not the letter name</b> - the sound it makes.',
+    line: SAY[l],
+    saves: l === 'c' ? ['ph_c', 'ph_k'] : ['ph_' + l]
+  };
+}
+
+function textItem(id, kind, label, text, hint) {
+  return { id: id, tier: 'tts', kind: kind, label: label,
+           prompt: '<span class="word">' + text.replace(/\[PAUSE:[0-9.]+\]/g, '') + '</span>',
+           hint: hint, line: text, saves: [id] };
+}
+
+function buildItems() {
+  const out = [];
+  WORDS.forEach(function (w) { out.push(blendItem(w[0], w[1])); });
+  HARD.forEach(function (l) { out.push(phItem(l)); });
+  'abcdefghijklmnopqrstuvwxyz'.split('').forEach(function (l) {
+    if (l !== 'k' && HARD.indexOf(l) < 0) out.push(phItem(l));
+  });
+  WORDS.forEach(function (w) {
+    out.push(textItem('word_' + w[0], 'Word', 'Whole word', w[0],
+      'Ordinary voice, like you are pointing at the picture.'));
+  });
+  UI.forEach(function (u) {
+    out.push(textItem(u[0], 'Instruction', 'Instruction', u[1],
+      'Warm and unhurried. Say it to him, not to a microphone.'));
+  });
+  PRAISE.forEach(function (t, i) {
+    out.push(textItem('praise_' + (i + 1), 'Praise', 'Praise', t,
+      'Sound like you mean it. Short - the app plays these often.'));
+  });
+  TRIES.forEach(function (t, i) {
+    out.push(textItem('try_' + (i + 1), 'Try again', 'Try again', t,
+      'Kind, never disappointed. He will hear this a lot.'));
+  });
+  BOOK.forEach(function (b) {
+    out.push(textItem(b[0], 'Book', 'Book page', b[1],
+      'Slow, with the full stops landing. Let the pauses breathe.'));
+  });
+  Object.keys(NAMES).forEach(function (l) {
+    out.push(textItem('name_' + l, 'Letter name', 'Letter name', NAMES[l],
+      'Read it as the letter name, the way you would in the alphabet.'));
+  });
+  return out;
+}
+
+const ALL_ITEMS = buildItems();
+
+</script>
+<script>
+(function () {
+'use strict';
+
+var $ = function (id) { return document.getElementById(id); };
+var state = { mode: 'essentials', items: [], idx: 0, takes: new Map(), skipped: new Set() };
+var pending = null;      // {blob, ms} for the take just recorded but not kept
+var media = null, rec = null, chunks = [], ac = null, analyser = null, meterRAF = 0;
+
+// ---------- storage ----------------------------------------------------------
+var dbp = null;
+function openDB() {
+  if (dbp) return dbp;
+  dbp = new Promise(function (res, rej) {
+    var r = indexedDB.open('aster-voice', 1);
+    r.onupgradeneeded = function () { r.result.createObjectStore('clips', { keyPath: 'id' }); };
+    r.onsuccess = function () { res(r.result); };
+    r.onerror = function () { rej(r.error); };
+  });
+  return dbp;
+}
+function tx(mode) {
+  return openDB().then(function (db) { return db.transaction('clips', mode).objectStore('clips'); });
+}
+function dbAll() {
+  return tx('readonly').then(function (s) {
+    return new Promise(function (res, rej) {
+      var req = s.getAll();
+      req.onsuccess = function () { res(req.result || []); };
+      req.onerror = function () { rej(req.error); };
+    });
+  });
+}
+function dbPut(rec) {
+  return tx('readwrite').then(function (s) {
+    return new Promise(function (res, rej) {
+      var req = s.put(rec);
+      req.onsuccess = res; req.onerror = function () { rej(req.error); };
+    });
+  });
+}
+function dbDel(id) {
+  return tx('readwrite').then(function (s) {
+    return new Promise(function (res, rej) {
+      var req = s.delete(id);
+      req.onsuccess = res; req.onerror = function () { rej(req.error); };
+    });
+  });
+}
+function dbClear() {
+  return tx('readwrite').then(function (s) {
+    return new Promise(function (res, rej) {
+      var req = s.clear();
+      req.onsuccess = res; req.onerror = function () { rej(req.error); };
+    });
+  });
+}
+
+// ---------- microphone -------------------------------------------------------
+function pickMime() {
+  var tries = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus'];
+  for (var i = 0; i < tries.length; i++) {
+    if (window.MediaRecorder && MediaRecorder.isTypeSupported(tries[i])) return tries[i];
+  }
+  return '';
+}
+
+function ensureMic() {
+  if (media) return Promise.resolve(media);
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    return Promise.reject(new Error('no-mic-api'));
+  }
+  return navigator.mediaDevices.getUserMedia({
+    audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 }
+  }).then(function (stream) {
+    media = stream;
+    ac = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 44100 });
+    var src = ac.createMediaStreamSource(stream);
+    analyser = ac.createAnalyser();
+    analyser.fftSize = 1024;
+    src.connect(analyser);
+    return media;
+  });
+}
+
+function startMeter() {
+  if (!analyser) return;
+  var buf = new Float32Array(analyser.fftSize);
+  var fill = $('meterFill');
+  $('meter').classList.add('live');
+  (function frame() {
+    analyser.getFloatTimeDomainData(buf);
+    var sum = 0;
+    for (var i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+    var rms = Math.sqrt(sum / buf.length);
+    var pct = Math.min(100, Math.round(rms * 420));
+    fill.style.width = pct + '%';
+    meterRAF = requestAnimationFrame(frame);
+  })();
+}
+function stopMeter() {
+  cancelAnimationFrame(meterRAF);
+  $('meter').classList.remove('live');
+  $('meterFill').style.width = '0%';
+}
+
+// ---------- record -----------------------------------------------------------
+function startRec() {
+  ensureMic().then(function () {
+    chunks = [];
+    var mime = pickMime();
+    try { rec = new MediaRecorder(media, mime ? { mimeType: mime } : undefined); }
+    catch (e) { rec = new MediaRecorder(media); }
+    rec.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
+    rec.onstop = function () {
+      var blob = new Blob(chunks, { type: rec.mimeType || 'audio/webm' });
+      var ctx = ac || new (window.AudioContext || window.webkitAudioContext)();
+      blob.arrayBuffer().then(function (ab) { return ctx.decodeAudioData(ab); }).then(function (buf) {
+        pending = { blob: blob, ms: Math.round(buf.duration * 1000) };
+        showTake(true);
+      }).catch(function () {
+        pending = { blob: blob, ms: 0 };
+        showTake(true);
+      });
+      stopMeter();
+    };
+    rec.start();
+    setRecording(true);
+    startMeter();
+  }).catch(function (err) {
+    banner('Could not reach the microphone. ' + explainMic(err));
+  });
+}
+
+function stopRec() {
+  if (rec && rec.state === 'recording') rec.stop();
+  setRecording(false);
+}
+
+function setRecording(on) {
+  $('recBtn').classList.toggle('hidden', on);
+  $('stopBtn').classList.toggle('hidden', !on);
+  $('stopBtn').classList.toggle('pulse', on);
+  $('afterRow').classList.add('hidden');
+  if (on) { pending = null; }
+}
+
+function showTake(show) {
+  $('recBtn').classList.toggle('hidden', show);
+  $('stopBtn').classList.add('hidden');
+  $('afterRow').classList.toggle('hidden', !show);
+  $('playBtn').textContent = 'Play' + (pending && pending.ms ? ' (' + (pending.ms / 1000).toFixed(1) + 's)' : '');
+}
+
+function playPending() {
+  var t = pending || state.takes.get(state.items[state.idx].id);
+  if (!t) return;
+  var a = new Audio(URL.createObjectURL(t.blob));
+  a.play();
+  a.onended = function () { URL.revokeObjectURL(a.src); };
+}
+
+// ---------- keep / navigate --------------------------------------------------
+function keep() {
+  var it = state.items[state.idx];
+  if (!it) return;
+  if (pending) { state.takes.set(it.id, pending); dbPut({ id: it.id, blob: pending.blob, ms: pending.ms }); }
+  pending = null;
+  state.skipped.delete(it.id);
+  next();
+}
+
+function retry() { pending = null; showTake(false); }
+
+function next() {
+  state.idx++;
+  pending = null;
+  if (state.idx >= state.items.length) return showDone();
+  render();
+}
+
+function back() {
+  if (state.idx > 0) state.idx--;
+  pending = null;
+  render();
+}
+
+function skip() {
+  var it = state.items[state.idx];
+  if (it) state.skipped.add(it.id);
+  next();
+}
+
+// ---------- render -----------------------------------------------------------
+function render() {
+  var it = state.items[state.idx];
+  if (!it) return showDone();
+  pending = null;
+
+  $('count').textContent = (state.idx + 1) + ' of ' + state.items.length;
+  $('bar').style.width = pctDone() + '%';
+  $('modeLabel').textContent = state.mode === 'essentials' ? 'essentials only' : 'all 136';
+  $('kicker').innerHTML = '<span class="dot' + (it.tier === 'must' ? '' : ' warm') + '"></span>' +
+                          it.label + (it.tier === 'must' ? ' &middot; needed' : '');
+  $('prompt').innerHTML = it.prompt;
+  $('prompt').style.fontSize = it.line.length > 34 ? '1.15rem'
+                            : it.line.length > 20 ? '1.5rem' : '';
+  $('hint').innerHTML = it.hint;
+
+  var have = state.takes.get(it.id);
+  if (have) { pending = have; showTake(true); }
+  else { showTake(false); }
+  $('recBtn').disabled = false;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function pctDone() {
+  if (!state.items.length) return 0;
+  var n = 0;
+  state.items.forEach(function (i) { if (state.takes.has(i.id)) n++; });
+  return Math.round(100 * n / state.items.length);
+}
+
+function showDone() {
+  $('screenRecord').classList.add('hidden');
+  $('screenStart').classList.add('hidden');
+  $('screenDone').classList.remove('hidden');
+  var n = state.takes.size;
+  $('doneKicker').textContent = n ? n + ' recorded' : 'Nothing recorded yet';
+  $('doneTitle').textContent = n ? 'Thank you - that is the hard part done.' : 'Nothing to export yet.';
+  $('doneHint').textContent = n
+    ? 'Download the zip, open it, and drop the files into aster-reads/audio/.'
+    : 'Go back and record a few first.';
+  $('zipBtn').disabled = !n;
+
+  var ul = $('zipList');
+  ul.innerHTML = '';
+  var keys = Array.from(state.takes.keys());
+  keys.forEach(function (k) {
+    var it = ALL_ITEMS.filter(function (i) { return i.id === k; })[0];
+    var li = document.createElement('li');
+    li.innerHTML = '<span class="tick">&#10003;</span><span class="id">' + k + '.wav</span>' +
+                   '<span class="said">' + (it ? it.line : '') + '</span>';
+    ul.appendChild(li);
+  });
+  if (state.skipped.size) {
+    var head = document.createElement('li');
+    head.innerHTML = '<span class="id">skipped: ' + Array.from(state.skipped).join(', ') + '</span>';
+    ul.appendChild(head);
+  }
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function banner(html) {
+  $('banner').innerHTML = html;
+  $('banner').classList.remove('hidden');
+}
+
+function explainMic(err) {
+  if (!window.isSecureContext) {
+    return 'This page needs to be opened at <code>http://localhost:8777/aster-reads/recorder/</code>, ' +
+           'not by double-clicking the file. Run <code>serve.ps1</code> in the project folder first.';
+  }
+  return 'Check the little microphone icon in the address bar and allow access, then reload.';
+}
+
+// ---------- audio maths ------------------------------------------------------
+function encodeWav(samples, sampleRate) {
+  var n = samples.length;
+  var buf = new ArrayBuffer(44 + n * 2);
+  var v = new DataView(buf);
+  var str = function (off, s) { for (var i = 0; i < s.length; i++) v.setUint8(off + i, s.charCodeAt(i)); };
+  str(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); str(8, 'WAVE');
+  str(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, sampleRate, true); v.setUint32(28, sampleRate * 2, true);
+  v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+  str(36, 'data'); v.setUint32(40, n * 2, true);
+  var off = 44;
+  for (var i = 0; i < n; i++) {
+    var s = Math.max(-1, Math.min(1, samples[i]));
+    v.setInt16(off, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+    off += 2;
+  }
+  return new Uint8Array(buf);
+}
+
+function toWav(buffer) {
+  var sr = buffer.sampleRate;
+  var ch = buffer.getChannelData(0);
+  var thresh = 0.004, a = 0, b = ch.length - 1;
+  while (a < ch.length && Math.abs(ch[a]) < thresh) a++;
+  while (b > a && Math.abs(ch[b]) < thresh) b--;
+  var pad = Math.round(0.06 * sr);
+  a = Math.max(0, a - pad);
+  b = Math.min(ch.length - 1, b + pad);
+  if (b <= a) { a = 0; b = ch.length - 1; }
+  var n = b - a + 1;
+  var out = new Float32Array(n);
+  out.set(ch.subarray(a, b + 1));
+  var peak = 0;
+  for (var i = 0; i < n; i++) { var q = Math.abs(out[i]); if (q > peak) peak = q; }
+  var gain = peak > 0.001 ? 0.7 / peak : 1;
+  var f = Math.min(Math.round(0.005 * sr), Math.floor(n / 2));
+  for (var j = 0; j < n; j++) {
+    var val = out[j] * gain;
+    if (j < f) val *= j / f;
+    if (j >= n - f) val *= (n - 1 - j) / f;
+    out[j] = val;
+  }
+  return encodeWav(out, sr);
+}
+
+// ---------- zip --------------------------------------------------------------
+var CRC_TABLE = (function () {
+  var t = new Uint32Array(256);
+  for (var n = 0; n < 256; n++) {
+    var c = n;
+    for (var k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+
+function crc32(u8) {
+  var crc = 0xFFFFFFFF;
+  for (var i = 0; i < u8.length; i++) crc = CRC_TABLE[(crc ^ u8[i]) & 0xFF] ^ (crc >>> 8);
+  return (crc ^ 0xFFFFFFFF) >>> 0;
+}
+
+function makeZip(files) {
+  var enc = new TextEncoder();
+  var parts = [], central = [], offset = 0;
+  var now = new Date();
+  var t = ((now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1)) & 0xFFFF;
+  var d = (((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate()) & 0xFFFF;
+
+  files.forEach(function (f) {
+    var name = enc.encode(f.name);
+    var crc = crc32(f.data);
+    var lh = new DataView(new ArrayBuffer(30));
+    lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(6, 0, true);
+    lh.setUint16(8, 0, true); lh.setUint16(10, t, true); lh.setUint16(12, d, true);
+    lh.setUint32(14, crc, true); lh.setUint32(18, f.data.length, true);
+    lh.setUint32(22, f.data.length, true); lh.setUint16(26, name.length, true); lh.setUint16(28, 0, true);
+    parts.push(new Uint8Array(lh.buffer), name, f.data);
+
+    var cd = new DataView(new ArrayBuffer(46));
+    cd.setUint32(0, 0x02014b50, true); cd.setUint16(4, 20, true); cd.setUint16(6, 20, true);
+    cd.setUint16(8, 0, true); cd.setUint16(10, 0, true); cd.setUint16(12, t, true); cd.setUint16(14, d, true);
+    cd.setUint32(16, crc, true); cd.setUint32(20, f.data.length, true); cd.setUint32(24, f.data.length, true);
+    cd.setUint16(28, name.length, true); cd.setUint16(30, 0, true); cd.setUint16(32, 0, true);
+    cd.setUint16(34, 0, true); cd.setUint16(36, 0, true); cd.setUint32(38, 0, true);
+    cd.setUint32(42, offset, true);
+    central.push(new Uint8Array(cd.buffer), name);
+
+    offset += 30 + name.length + f.data.length;
+  });
+
+  var cdSize = 0;
+  central.forEach(function (c) { cdSize += c.length; });
+  var eocd = new DataView(new ArrayBuffer(22));
+  eocd.setUint32(0, 0x06054b50, true);
+  eocd.setUint16(8, files.length, true); eocd.setUint16(10, files.length, true);
+  eocd.setUint32(12, cdSize, true); eocd.setUint32(16, offset, true);
+
+  return new Blob(parts.concat(central, [new Uint8Array(eocd.buffer)]), { type: 'application/zip' });
+}
+
+function exportZip() {
+  var keys = Array.from(state.takes.keys());
+  if (!keys.length) return;
+  $('zipBtn').disabled = true;
+  $('zipBtn').textContent = 'Packing...';
+
+  var ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 44100 });
+  var jobs = keys.map(function (id) {
+    var t = state.takes.get(id);
+    return t.blob.arrayBuffer()
+      .then(function (ab) { return ctx.decodeAudioData(ab); })
+      .then(function (buf) {
+        return { name: id + '.wav', data: toWav(buf) };
+      })
+      .catch(function () { return null; });
+  });
+
+  Promise.all(jobs).then(function (files) {
+    var good = files.filter(Boolean);
+    var blob = makeZip(good);
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'aster-voice-' + new Date().toISOString().slice(0, 10) + '.zip';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
+    $('zipBtn').disabled = false;
+    $('zipBtn').textContent = 'Download .zip (' + good.length + ' files)';
+    $('doneHint').textContent = good.length + ' files packed. Drop them into aster-reads/audio/.';
+  });
+}
+
+// ---------- wire up ----------------------------------------------------------
+function setMode(m) {
+  state.mode = m;
+  $('choiceEssentials').classList.toggle('on', m === 'essentials');
+  $('choiceAll').classList.toggle('on', m === 'all');
+  state.items = m === 'essentials'
+    ? ALL_ITEMS.filter(function (i) { return i.tier !== 'tts'; })
+    : ALL_ITEMS;
+  state.idx = 0;
+  $('sub').innerHTML = m === 'essentials'
+    ? 'Record these straight into the browser. <b>' + state.items.length + ' clips, about 6 minutes.</b>'
+    : 'Record these straight into the browser. <b>' + state.items.length + ' clips, about 25 minutes.</b>';
+}
+
+function startRecording() {
+  $('screenStart').classList.add('hidden');
+  $('screenRecord').classList.remove('hidden');
+  render();
+  ensureMic().catch(function (err) { banner('Could not reach the microphone. ' + explainMic(err)); });
+}
+
+function resumeAt() {
+  var i = state.items.findIndex(function (it) { return !state.takes.has(it.id); });
+  state.idx = i < 0 ? 0 : i;
+  startRecording();
+}
+
+function init() {
+  $('recBtn').onclick = startRec;
+  $('stopBtn').onclick = stopRec;
+  $('playBtn').onclick = playPending;
+  $('keepBtn').onclick = keep;
+  $('retryBtn').onclick = retry;
+  $('backBtn').onclick = back;
+  $('skipBtn').onclick = skip;
+  $('startBtn').onclick = startRecording;
+  $('resumeBtn').onclick = resumeAt;
+  $('zipBtn').onclick = exportZip;
+  $('backToRecord').onclick = function () { $('screenDone').classList.add('hidden'); startRecording(); };
+  $('wipeBtn').onclick = function () {
+    if (!confirm('Delete every recording in this browser?')) return;
+    dbClear().then(function () {
+      state.takes.clear(); state.skipped.clear(); state.idx = 0;
+      $('screenDone').classList.add('hidden');
+      $('screenStart').classList.remove('hidden');
+      $('resumeBtn').classList.add('hidden');
+      $('startBar').style.width = '0%';
+    });
+  };
+  $('choiceEssentials').onclick = function () { setMode('essentials'); };
+  $('choiceAll').onclick = function () { setMode('all'); };
+
+  document.addEventListener('keydown', function (e) {
+    if ($('screenRecord').classList.contains('hidden')) return;
+    var tag = (e.target.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'textarea') return;
+    if (e.code === 'Space') {
+      e.preventDefault();
+      if (rec && rec.state === 'recording') stopRec(); else startRec();
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (pending) keep();
+    } else if (e.key === 'r' || e.key === 'R') {
+      e.preventDefault();
+      retry();
+    }
+  });
+
+  if (!window.isSecureContext || !navigator.mediaDevices) {
+    banner('The microphone only works on <code>http://localhost</code>. Run ' +
+           '<code>serve.ps1</code> in the project folder, then open ' +
+           '<code>http://localhost:8777/aster-reads/recorder/</code>.');
+  }
+
+  setMode('essentials');
+
+  dbAll().then(function (rows) {
+    rows.forEach(function (r) { state.takes.set(r.id, { blob: r.blob, ms: r.ms }); });
+    if (state.takes.size) {
+      $('resumeBtn').classList.remove('hidden');
+      $('resumeBtn').textContent = 'Resume (' + state.takes.size + ' already done)';
+      $('startBar').style.width = pctDone() + '%';
+    }
+    $('screenStart').classList.remove('hidden');
+    $('handledList').innerHTML = ALL_ITEMS.filter(function (i) { return i.tier === 'tts'; })
+      .map(function (i) { return '<li><span class="id">' + i.id + '.wav</span><span class="said">' +
+        i.line.replace(/\[PAUSE:[0-9.]+\]/g, '') + '</span></li>'; }).join('');
+    $('handledCount').textContent = 'See the ' +
+      ALL_ITEMS.filter(function (i) { return i.tier === 'tts'; }).length +
+      ' clips VoiceWave is handling';
+  });
+}
+
+init();
+})();
+
+</script>
+</body>
+</html>

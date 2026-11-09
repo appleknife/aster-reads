@@ -1,0 +1,15 @@
+# Written by tools/check_audio.py
+audio/manifest.json
+
+# Zips exported by the recorder
+aster-voice-*.zip
+*.zip
+
+# OS clutter
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# The recordings themselves are committed on purpose, so the Pages deployment
+# works for her. If this repo is ever made public, that includes her voice and
+# Aster's name - take them out first.
