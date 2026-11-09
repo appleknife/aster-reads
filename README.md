@@ -4,6 +4,9 @@ A reading app for Aster, in his mother's voice.
 
 Two games and a book, built around the six letters he will learn first.
 
+**Recorder, live:** <https://appleknife.github.io/aster-reads/recorder/> — open it on a
+laptop or an iPad, no install, nothing uploaded.
+
 ## Start here
 
 1. **[recorder/](recorder/index.html)** - the recording studio for Aster's mother. It
@@ -15,6 +18,11 @@ Two games and a book, built around the six letters he will learn first.
    have to be (stricter than you would guess), and what to buy versus take for free.
 
 ## Recording
+
+**<https://appleknife.github.io/aster-reads/recorder/>** — this is the easy path. It is
+served over HTTPS, so the microphone works on an iPad or a phone as well as a laptop.
+
+To run it locally instead, from the project root:
 
 ```
 powershell -NoProfile -ExecutionPolicy Bypass -File serve.ps1
