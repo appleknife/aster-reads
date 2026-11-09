@@ -1,6 +1,8 @@
-# Aster Reads — voice script
+# The voice script — Aster's mother
 
-Every line in this document is **one generation → one file**. Paste the text, export, name the file exactly as shown.
+Everything in this document is said by **you**, in your own voice. Aster never speaks
+in this app; he listens. Every line is **one generation → one file**: paste the text,
+export it, name the file exactly as shown.
 
 ---
 

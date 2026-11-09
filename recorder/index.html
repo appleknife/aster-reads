@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light">
-<title>Aster's voice - record these</title>
+<title>Record your voice for Aster</title>
 <style>
   :root{
     --bg:#f7f5f0; --card:#ffffff; --ink:#20201d; --muted:#6f6a61;
@@ -77,14 +77,21 @@
 <div class="wrap">
 
   <header id="screenHead">
-    <h1>Aster's voice</h1>
-    <p class="sub" id="sub">Record these straight into the browser. <b>34 clips, about 6 minutes.</b></p>
+    <h1>Record your voice for Aster</h1>
+    <p class="sub" id="sub">Aster will hear you. <b>34 clips, about 6 minutes.</b></p>
   </header>
 
   <div id="banner" class="warn hidden"></div>
 
   <section id="screenStart" class="hidden">
     <div class="bar"><i id="startBar"></i></div>
+
+    <p class="note" style="margin:0 0 18px">
+      You are recording <b>your own voice</b> - not Aster's, and Aster does not need to be
+      here. When he plays the reading app, the instructions and the praise he hears will
+      be you talking to him.
+    </p>
+
     <button class="choice on" id="choiceEssentials" type="button">
       <div class="t">Just the ones that need you - 34 clips</div>
       <div class="d">The 23 blends and the 11 trickiest letter sounds. VoiceWave handles the other 102, because text-to-speech is genuinely fine for whole words and whole sentences.</div>
@@ -754,8 +761,8 @@ function setMode(m) {
     : ALL_ITEMS;
   state.idx = 0;
   $('sub').innerHTML = m === 'essentials'
-    ? 'Record these straight into the browser. <b>' + state.items.length + ' clips, about 6 minutes.</b>'
-    : 'Record these straight into the browser. <b>' + state.items.length + ' clips, about 25 minutes.</b>';
+    ? 'Aster will hear you. <b>' + state.items.length + ' clips, about 6 minutes.</b>'
+    : 'Aster will hear you. <b>' + state.items.length + ' clips, about 25 minutes.</b>';
 }
 
 function startRecording() {
