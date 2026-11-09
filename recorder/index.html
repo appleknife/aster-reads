@@ -70,6 +70,12 @@
   .choice .t{font-weight:650;margin-bottom:3px}
   .choice .d{color:var(--muted);font-size:.9rem;font-weight:400}
   .choice.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+  .microw{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:-12px 0 16px;font-size:.83rem;color:var(--muted)}
+  .microw select{flex:1 1 170px;min-width:0;max-width:100%;font:inherit;font-size:.83rem;padding:7px 9px;border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--ink)}
+  .microw button{padding:7px 11px;min-height:0;font-size:.83rem;border-radius:9px}
+  .microw #micStatus{margin-left:auto}
+  .microw .ok{color:var(--accent);font-weight:600}
+  .microw .bad{color:#b3382c;font-weight:600}
   footer{margin-top:34px;color:var(--muted);font-size:.83rem;line-height:1.6}
 </style>
 </head>
@@ -94,7 +100,7 @@
 
     <button class="choice on" id="choiceEssentials" type="button">
       <div class="t">Just the ones that need you - 34 clips</div>
-      <div class="d">The 23 blends and the 11 trickiest letter sounds. VoiceWave handles the other 102, because text-to-speech is genuinely fine for whole words and whole sentences.</div>
+      <div class="d">The 23 blends and the 11 trickiest letter sounds. VoiceWave handles the other 101, because text-to-speech is genuinely fine for whole words and whole sentences.</div>
     </button>
     <button class="choice" id="choiceAll" type="button">
       <div class="t">Record all of it - 136 clips</div>
@@ -113,6 +119,13 @@
       <span class="count" id="modeLabel"></span>
     </div>
     <div class="bar"><i id="bar"></i></div>
+
+    <div class="microw">
+      <label for="micSelect">Mic</label>
+      <select id="micSelect"></select>
+      <button type="button" id="testBtn">Test</button>
+      <span id="micStatus"></span>
+    </div>
 
     <div class="card" id="card">
       <div class="kicker" id="kicker"></div>
@@ -417,22 +430,155 @@ function pickMime() {
   return '';
 }
 
-function ensureMic() {
-  if (media) return Promise.resolve(media);
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    return Promise.reject(new Error('no-mic-api'));
+var chosenDeviceId = '';
+var lastPeak = 0;
+var testTimer = 0;
+
+function micConstraints(deviceId) {
+  var a = { echoCancellation: false, noiseSuppression: false, autoGainControl: false };
+  if (deviceId) a.deviceId = { exact: deviceId };
+  return { audio: a };
+}
+
+function stopMic() {
+  if (media) {
+    media.getTracks().forEach(function (t) { t.stop(); });
+    media = null;
   }
-  return navigator.mediaDevices.getUserMedia({
-    audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 }
-  }).then(function (stream) {
-    media = stream;
-    ac = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 44100 });
-    var src = ac.createMediaStreamSource(stream);
-    analyser = ac.createAnalyser();
-    analyser.fftSize = 1024;
-    src.connect(analyser);
-    return media;
-  });
+  analyser = null;
+  if (ac) { try { ac.close(); } catch (e) {} ac = null; }
+}
+
+function ensureMic(force) {
+  if (media && !force) return Promise.resolve(media);
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    var e = new Error('no getUserMedia');
+    e.name = window.isSecureContext ? 'NotSupportedError' : 'SecurityError';
+    return Promise.reject(e);
+  }
+  if (force) stopMic();
+
+  return navigator.mediaDevices.getUserMedia(micConstraints(chosenDeviceId))
+    .catch(function (err) {
+      // a remembered device may have gone away (an uninstalled virtual cable,
+      // Voicemod not running) - fall back to whatever the system default is
+      if (chosenDeviceId && (err.name === 'OverconstrainedError' || err.name === 'NotFoundError')) {
+        chosenDeviceId = '';
+        try { localStorage.removeItem('aster-mic'); } catch (e) {}
+        return navigator.mediaDevices.getUserMedia(micConstraints(''));
+      }
+      throw err;
+    })
+    .then(function (stream) {
+      media = stream;
+      ac = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 44100 });
+      var src = ac.createMediaStreamSource(stream);
+      analyser = ac.createAnalyser();
+      analyser.fftSize = 1024;
+      src.connect(analyser);
+      try {
+        var st = stream.getAudioTracks()[0].getSettings();
+        if (st && st.deviceId) {
+          chosenDeviceId = st.deviceId;
+          localStorage.setItem('aster-mic', st.deviceId);
+        }
+      } catch (e) {}
+      clearBanner();
+      refreshDevices();
+      return media;
+    });
+}
+
+function setMicStatus(kind, text) {
+  var s = $('micStatus');
+  if (!s) return;
+  s.className = kind || '';
+  s.textContent = text || '';
+}
+
+function refreshDevices() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
+  navigator.mediaDevices.enumerateDevices().then(function (list) {
+    var inputs = list.filter(function (d) { return d.kind === 'audioinput'; });
+    var sel = $('micSelect');
+    sel.innerHTML = '';
+    if (!inputs.length) {
+      var none = document.createElement('option');
+      none.value = '';
+      none.textContent = 'no microphone found';
+      sel.appendChild(none);
+      setMicStatus('bad', 'none found');
+      return;
+    }
+    inputs.forEach(function (d, i) {
+      var o = document.createElement('option');
+      o.value = d.deviceId;
+      o.textContent = d.label || ('Microphone ' + (i + 1));
+      sel.appendChild(o);
+    });
+    var active = '';
+    if (media && media.getAudioTracks().length) {
+      var st = media.getAudioTracks()[0].getSettings();
+      if (st && st.deviceId) active = st.deviceId;
+    }
+    sel.value = active || chosenDeviceId || inputs[0].deviceId;
+  }).catch(function () {});
+}
+
+function onDeviceChange() {
+  chosenDeviceId = $('micSelect').value;
+  setMicStatus('', 'switching...');
+  ensureMic(true).then(function () { testMic(5000); }).catch(showMicError);
+}
+
+function testMic(ms) {
+  clearTimeout(testTimer);
+  ensureMic().then(function () {
+    lastPeak = 0;
+    startMeter();
+    setMicStatus('', 'say something...');
+    testTimer = setTimeout(function () {
+      stopMeter();
+      if (lastPeak > 0.02) setMicStatus('ok', 'hearing you');
+      else setMicStatus('bad', 'silent - wrong device?');
+    }, ms || 6000);
+  }).catch(showMicError);
+}
+
+function micAdvice(err) {
+  var n = (err && err.name) ? String(err.name) : 'Error';
+  if (n === 'NotAllowedError' || n === 'PermissionDeniedError') {
+    return 'The browser is blocking this page from using the microphone. Click the padlock ' +
+           'or the microphone icon at the left of the address bar, set Microphone to ' +
+           '<b>Allow</b>, then reload the page.';
+  }
+  if (n === 'NotFoundError' || n === 'DevicesNotFoundError') {
+    return 'No microphone was found. If Voicemod is installed it may have replaced the ' +
+           'Windows default input with a virtual device that only exists while Voicemod is ' +
+           'running. Start Voicemod, or pick your real microphone from the list above.';
+  }
+  if (n === 'NotReadableError' || n === 'TrackStartError') {
+    return 'The microphone was found but the system would not open it. That usually means ' +
+           'another program is holding it - Voicemod, Discord, Teams, Zoom, a recording app - ' +
+           'or Windows privacy settings are blocking desktop apps. Quit the other program, or ' +
+           'pick a different microphone above.';
+  }
+  if (n === 'OverconstrainedError' || n === 'ConstraintNotSatisfiedError') {
+    return 'That microphone refused the requested settings. Pick a different one above.';
+  }
+  if (n === 'SecurityError') {
+    return 'The browser will not give a page microphone access from this address. It has to ' +
+           'be served over https, or from http://localhost.';
+  }
+  return 'The microphone could not be opened (' + n + '). Try another device above, and check ' +
+         'Windows Settings, Privacy and security, Microphone.';
+}
+
+function showMicError(err) {
+  var n = (err && err.name) ? String(err.name) : 'Error';
+  banner('<b>Microphone problem - ' + n + '</b><br>' + micAdvice(err));
+  setMicStatus('bad', 'not connected');
+  refreshDevices();
 }
 
 function startMeter() {
@@ -442,9 +588,14 @@ function startMeter() {
   $('meter').classList.add('live');
   (function frame() {
     analyser.getFloatTimeDomainData(buf);
-    var sum = 0;
-    for (var i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+    var sum = 0, pk = 0;
+    for (var i = 0; i < buf.length; i++) {
+      var v = buf[i];
+      sum += v * v;
+      if (Math.abs(v) > pk) pk = Math.abs(v);
+    }
     var rms = Math.sqrt(sum / buf.length);
+    lastPeak = Math.max(lastPeak * 0.92, pk);
     var pct = Math.min(100, Math.round(rms * 420));
     fill.style.width = pct + '%';
     meterRAF = requestAnimationFrame(frame);
@@ -479,9 +630,7 @@ function startRec() {
     rec.start();
     setRecording(true);
     startMeter();
-  }).catch(function (err) {
-    banner('Could not reach the microphone. ' + explainMic(err));
-  });
+  }).catch(showMicError);
 }
 
 function stopRec() {
@@ -608,12 +757,9 @@ function banner(html) {
   $('banner').classList.remove('hidden');
 }
 
-function explainMic(err) {
-  if (!window.isSecureContext) {
-    return 'This page needs to be opened at <code>http://localhost:8777/aster-reads/recorder/</code>, ' +
-           'not by double-clicking the file. Run <code>serve.ps1</code> in the project folder first.';
-  }
-  return 'Check the little microphone icon in the address bar and allow access, then reload.';
+function clearBanner() {
+  $('banner').classList.add('hidden');
+  $('banner').innerHTML = '';
 }
 
 // ---------- audio maths ------------------------------------------------------
@@ -769,7 +915,7 @@ function startRecording() {
   $('screenStart').classList.add('hidden');
   $('screenRecord').classList.remove('hidden');
   render();
-  ensureMic().catch(function (err) { banner('Could not reach the microphone. ' + explainMic(err)); });
+  ensureMic().catch(showMicError);
 }
 
 function resumeAt() {
@@ -802,6 +948,8 @@ function init() {
   };
   $('choiceEssentials').onclick = function () { setMode('essentials'); };
   $('choiceAll').onclick = function () { setMode('all'); };
+  $('micSelect').onchange = onDeviceChange;
+  $('testBtn').onclick = function () { testMic(6000); };
 
   document.addEventListener('keydown', function (e) {
     if ($('screenRecord').classList.contains('hidden')) return;
@@ -826,6 +974,12 @@ function init() {
   }
 
   setMode('essentials');
+
+  try { chosenDeviceId = localStorage.getItem('aster-mic') || ''; } catch (e) {}
+  if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
+    navigator.mediaDevices.addEventListener('devicechange', refreshDevices);
+  }
+  refreshDevices();
 
   dbAll().then(function (rows) {
     rows.forEach(function (r) { state.takes.set(r.id, { blob: r.blob, ms: r.ms }); });
