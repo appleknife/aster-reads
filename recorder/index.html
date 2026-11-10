@@ -608,32 +608,77 @@ function stopMeter() {
 }
 
 // ---------- record -----------------------------------------------------------
+// recState: 'idle' | 'starting' | 'recording' | 'finishing'
+// Only one take can be in flight at a time; extra taps are ignored.
+var recState = 'idle';
+var player = null;   // the single Audio element used for playback
+
+function stopPlayback() {
+  if (player) {
+    try { player.pause(); } catch (e) {}
+    if (player.src) URL.revokeObjectURL(player.src);
+    player.onended = null;
+    player = null;
+  }
+}
+
 function startRec() {
+  if (recState !== 'idle') return;          // already starting/recording/finishing
+  stopPlayback();                           // never record over an old take playing
+  recState = 'starting';
+  $('recBtn').disabled = true;
+  var item = state.items[state.idx];
+  var itemId = item ? item.id : null;
+
   ensureMic().then(function () {
-    chunks = [];
+    if (recState !== 'starting') return;    // cancelled while the mic was opening
+    if (ac && ac.state === 'suspended') { try { ac.resume(); } catch (e) {} }
+    var myChunks = [];                      // private to THIS take
     var mime = pickMime();
-    try { rec = new MediaRecorder(media, mime ? { mimeType: mime } : undefined); }
-    catch (e) { rec = new MediaRecorder(media); }
-    rec.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
-    rec.onstop = function () {
-      var blob = new Blob(chunks, { type: rec.mimeType || 'audio/webm' });
-      var ctx = ac || new (window.AudioContext || window.webkitAudioContext)();
-      blob.arrayBuffer().then(function (ab) { return ctx.decodeAudioData(ab); }).then(function (buf) {
-        pending = { blob: blob, ms: Math.round(buf.duration * 1000) };
-        showTake(true);
-      }).catch(function () {
-        pending = { blob: blob, ms: 0 };
-        showTake(true);
-      });
+    var r;
+    try { r = new MediaRecorder(media, mime ? { mimeType: mime } : undefined); }
+    catch (e) { r = new MediaRecorder(media); }
+    rec = r;
+    r.ondataavailable = function (e) { if (e.data && e.data.size) myChunks.push(e.data); };
+    r.onstop = function () {
       stopMeter();
+      var blob = new Blob(myChunks, { type: r.mimeType || 'audio/webm' });
+      var finish = function (ms) {
+        recState = 'idle';
+        $('recBtn').disabled = false;
+        var cur = state.items[state.idx];
+        // she moved on before the take finished saving - don't attach it to the wrong line
+        if (!cur || cur.id !== itemId) { showTake(!!pending); return; }
+        if (!blob.size) { banner('<b>That take came out empty.</b> Please press Record and try again.'); showTake(false); return; }
+        pending = { blob: blob, ms: ms };
+        showTake(true);
+      };
+      var ctx = ac || new (window.AudioContext || window.webkitAudioContext)();
+      blob.arrayBuffer().then(function (ab) { return ctx.decodeAudioData(ab); })
+        .then(function (buf) { finish(Math.round(buf.duration * 1000)); })
+        .catch(function () { finish(0); });
     };
-    rec.start();
+    r.start();
+    recState = 'recording';
     setRecording(true);
     startMeter();
-  }).catch(showMicError);
+  }).catch(function (err) {
+    recState = 'idle';
+    $('recBtn').disabled = false;
+    showMicError(err);
+  });
 }
 
 function stopRec() {
+  if (recState === 'starting') {            // tapped Stop before the mic even opened
+    recState = 'idle';
+    $('recBtn').disabled = false;
+    setRecording(false);
+    return;
+  }
+  if (recState !== 'recording') return;
+  recState = 'finishing';
+  $('recBtn').disabled = true;              // wait for the take to be saved
   if (rec && rec.state === 'recording') rec.stop();
   setRecording(false);
 }
@@ -654,15 +699,23 @@ function showTake(show) {
 }
 
 function playPending() {
-  var t = pending || state.takes.get(state.items[state.idx].id);
-  if (!t) return;
+  if (recState !== 'idle') return;
+  var cur = state.items[state.idx];
+  var t = pending || (cur && state.takes.get(cur.id));
+  if (!t || !t.blob) return;
+  // tapping Play again restarts the take instead of stacking a second copy on top
+  stopPlayback();
   var a = new Audio(URL.createObjectURL(t.blob));
-  a.play();
-  a.onended = function () { URL.revokeObjectURL(a.src); };
+  player = a;
+  a.onended = function () { if (player === a) stopPlayback(); };
+  var p = a.play();
+  if (p && p.catch) p.catch(function () { if (player === a) stopPlayback(); });
 }
 
 // ---------- keep / navigate --------------------------------------------------
 function keep() {
+  if (recState !== 'idle') return;
+  stopPlayback();
   var it = state.items[state.idx];
   if (!it) return;
   if (pending) { state.takes.set(it.id, pending); dbPut({ id: it.id, blob: pending.blob, ms: pending.ms }); }
@@ -671,9 +724,11 @@ function keep() {
   next();
 }
 
-function retry() { pending = null; showTake(false); }
+function retry() { if (recState !== 'idle') return; stopPlayback(); pending = null; showTake(false); }
 
 function next() {
+  stopPlayback();
+  if (recState === 'recording' || recState === 'starting') stopRec();
   state.idx++;
   pending = null;
   if (state.idx >= state.items.length) return showDone();
@@ -681,6 +736,8 @@ function next() {
 }
 
 function back() {
+  stopPlayback();
+  if (recState === 'recording' || recState === 'starting') stopRec();
   if (state.idx > 0) state.idx--;
   pending = null;
   render();
@@ -711,7 +768,7 @@ function render() {
   var have = state.takes.get(it.id);
   if (have) { pending = have; showTake(true); }
   else { showTake(false); }
-  $('recBtn').disabled = false;
+  $('recBtn').disabled = (recState !== 'idle');
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -957,10 +1014,12 @@ function init() {
     if (tag === 'input' || tag === 'textarea') return;
     if (e.code === 'Space') {
       e.preventDefault();
-      if (rec && rec.state === 'recording') stopRec(); else startRec();
+      // a focused Play/Keep button would otherwise ALSO fire on key-up
+      if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+      if (recState === 'recording' || recState === 'starting') stopRec(); else startRec();
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      if (pending) keep();
+      if (pending && recState === 'idle') keep();
     } else if (e.key === 'r' || e.key === 'R') {
       e.preventDefault();
       retry();
